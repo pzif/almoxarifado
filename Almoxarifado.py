@@ -1,200 +1,146 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import sqlite3
 
-# Variáveis globais
-entry_nome = None
-entry_quantidade = None
-treeview = None
-entry_usuario = None
-entry_senha = None
+def verificar_login():
+    username = entry_username.get()
+    password = entry_password.get()
 
-# Função para criar a tabela no banco de dados
-def criar_tabela():
-    conn = sqlite3.connect('almoxarifado.db')
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS estoque
-                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                       nome TEXT NOT NULL,
-                       quantidade INTEGER NOT NULL)''')
-    conn.commit()
-    conn.close()
-
-# Função para cadastrar um item no estoque
-def cadastrar_item():
-    global entry_nome
-    global entry_quantidade
-    nome = entry_nome.get()
-    quantidade = entry_quantidade.get()
-
-    if nome and quantidade:
-        conn = sqlite3.connect('almoxarifado.db')
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO estoque (nome, quantidade) VALUES (?, ?)', (nome, quantidade))
-        conn.commit()
-        conn.close()
-        messagebox.showinfo('Sucesso', 'Item cadastrado com sucesso.')
-        limpar_campos()
-        listar_itens()
+    # Verifique as credenciais do usuário
+    if username == "admin" and password == "123456":
+        messagebox.showinfo("Login", "Login bem-sucedido!")
+        # Destrua a janela de login e crie a nova janela com os menus
+        login_window.destroy()
+        estoque()
     else:
-        messagebox.showwarning('Erro', 'Preencha todos os campos.')
+        messagebox.showerror("Login", "Usuário ou senha incorretos.")
 
-# Função para excluir um item do estoque
-def excluir_item():
-    global treeview
-    selected_item = treeview.focus()
-    if selected_item:
-        item_id = treeview.item(selected_item)['text']
-        conn = sqlite3.connect('almoxarifado.db')
+def criar_usuario():
+    username = simpledialog.askstring("Novo Usuário", "Digite o nome de usuário:")
+    password = simpledialog.askstring("Novo Usuário", "Digite a senha:")
+    
+    if username and password:
+        # Conexão com o banco de dados SQLite
+        conn = sqlite3.connect("almoxarifado.db")
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM estoque WHERE id = ?', (item_id,))
-        conn.commit()
-        conn.close()
-        messagebox.showinfo('Sucesso', 'Item excluído com sucesso.')
-        listar_itens()
-    else:
-        messagebox.showwarning('Erro', 'Selecione um item para excluir.')
-
-# Função para alterar um item do estoque
-def alterar_item():
-    global treeview
-    global entry_nome
-    global entry_quantidade
-    selected_item = treeview.focus()
-    if selected_item:
-        item_id = treeview.item(selected_item)['text']
-        nome = entry_nome.get()
-        quantidade = entry_quantidade.get()
-
-        if nome and quantidade:
-            conn = sqlite3.connect('almoxarifado.db')
-            cursor = conn.cursor()
-            cursor.execute('UPDATE estoque SET nome = ?, quantidade = ? WHERE id = ?', (nome, quantidade, item_id))
+        
+        # Verifica se o usuário já existe
+        cursor.execute("SELECT * FROM usuarios WHERE username=?", (username,))
+        user = cursor.fetchone()
+        
+        if user:
+            messagebox.showerror("Novo Usuário", "O usuário já existe.")
+        else:
+            # Insere o novo usuário no banco de dados
+            cursor.execute("INSERT INTO usuarios (username, password) VALUES (?, ?)", (username, password))
             conn.commit()
-            conn.close()
-            messagebox.showinfo('Sucesso', 'Item alterado com sucesso.')
-            limpar_campos()
-            listar_itens()
-        else:
-            messagebox.showwarning('Erro', 'Preencha todos os campos.')
+            messagebox.showinfo("Novo Usuário", "Usuário criado com sucesso.")
     else:
-        messagebox.showwarning('Erro', 'Selecione um item para alterar.')
+        messagebox.showerror("Novo Usuário", "Nome de usuário e senha são obrigatórios.")
 
-# Função para listar os itens do estoque
-def listar_itens():
-    global treeview
-    conn = sqlite3.connect('almoxarifado.db')
+def estoque():
+    # Sistema do almoxarifado
+    menu_window = tk.Tk()
+    menu_window.title("Janela de Menus")
+    menu_window.geometry("400x300")
+
+
+    # Conexão com o banco de dados SQLite
+    conn = sqlite3.connect("almoxarifado.db")
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM estoque')
-    rows = cursor.fetchall()
-    treeview.delete(*treeview.get_children())
-    for row in rows:
-        treeview.insert('', 'end', text=row[0], values=(row[1], row[2]))
-    conn.close()
 
-# Função para limpar os campos de entrada
-def limpar_campos():
-    global entry_nome
-    global entry_quantidade
-    entry_nome.delete(0, 'end')
-    entry_quantidade.delete(0, 'end')
+    # Criação da tabela de itens do almoxarifado
+    cursor.execute("CREATE TABLE IF NOT EXISTS itens (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, quantidade INTEGER)")
 
-# Função para criar a janela de login
-def login():
-    global entry_usuario
-    global entry_senha
+    # Adicionar item ao almoxarifado
+    def cadastrar_item():
+        nome = entry_nome_item.get()
+        quantidade = entry_quantidade_item.get()
 
-    def autenticar():
-        usuario = entry_usuario.get()
-        senha = entry_senha.get()
-        if usuario == 'admin' and senha == '123456':
-            messagebox.showinfo('Sucesso', 'Login realizado com sucesso.')
-            login_window.destroy()
-            criar_tabela()
-            listar_itens()
-        else:
-            messagebox.showwarning('Erro', 'Usuário ou senha inválidos.')
+        cursor.execute("INSERT INTO itens (nome, quantidade) VALUES (?, ?)", (nome, quantidade))
+        conn.commit()
+        messagebox.showinfo("Cadastro de Item", "Item cadastrado com sucesso.")
 
-    login_window = tk.Toplevel(root)
-    login_window.title('Login')
+    # Excluir item do almoxarifado
+    def excluir_item():
+        item_id = entry_id_item.get()
 
-    label_usuario = tk.Label(login_window, text='Usuário:')
-    label_usuario.pack()
-    entry_usuario = tk.Entry(login_window)
-    entry_usuario.pack()
+        cursor.execute("DELETE FROM itens WHERE id=?", (item_id,))
+        conn.commit()
+        messagebox.showinfo("Exclusão de Item", "Item excluído com sucesso.")
 
-    label_senha = tk.Label(login_window, text='Senha:')
-    label_senha.pack()
-    entry_senha = tk.Entry(login_window, show='*')
-    entry_senha.pack()
+    # Alterar quantidade de um item no almoxarifado
+    def alterar_item():
+        item_id = entry_id_item.get()
+        nova_quantidade = entry_nova_quantidade.get()
 
-    btn_login = tk.Button(login_window, text='Login', command=autenticar)
-    btn_login.pack()
+        cursor.execute("UPDATE itens SET quantidade=? WHERE id=?", (nova_quantidade, item_id))
+        conn.commit()
+        messagebox.showinfo("Alteração de Item", "Quantidade do item alterada com sucesso.")
 
-# Função para criar a janela principal
-def main_window():
-    global entry_nome
-    global entry_quantidade
-    global treeview
+    # Listar todos os itens do almoxarifado
+    def listar_itens():
+        cursor.execute("SELECT * FROM itens")
+        itens = cursor.fetchall()
 
-    root.withdraw()
+        messagebox.showinfo("Itens do Almoxarifado", str(itens))
 
-    main_window = tk.Toplevel(root)
-    main_window.title('Sistema de Almoxarifado')
+    # Adicionar widgets para o sistema de almoxarifado
+    label_nome_item = tk.Label(menu_window, text="Nome do Item:", font=("Arial", 12))
+    label_nome_item.place(x=50, y=50)
+    entry_nome_item = tk.Entry(menu_window, font=("Arial", 12))
+    entry_nome_item.place(x=200, y=50)
 
-    frame_cadastro = tk.Frame(main_window)
-    frame_cadastro.pack(pady=10)
+    label_quantidade_item = tk.Label(menu_window, text="Quantidade:", font=("Arial", 12))
+    label_quantidade_item.place(x=50, y=80)
+    entry_quantidade_item = tk.Entry(menu_window, font=("Arial", 12))
+    entry_quantidade_item.place(x=200, y=80)
 
-    label_nome = tk.Label(frame_cadastro, text='Nome:')
-    label_nome.grid(row=0, column=0, sticky='w')
-    entry_nome = tk.Entry(frame_cadastro)
-    entry_nome.grid(row=0, column=1)
+    button_cadastrar_item = tk.Button(menu_window, text="Cadastrar Item", command=cadastrar_item, font=("Arial", 12))
+    button_cadastrar_item.place(x=150, y=120)
 
-    label_quantidade = tk.Label(frame_cadastro, text='Quantidade:')
-    label_quantidade.grid(row=1, column=0, sticky='w')
-    entry_quantidade = tk.Entry(frame_cadastro)
-    entry_quantidade.grid(row=1, column=1)
+    label_id_item = tk.Label(menu_window, text="ID do Item:", font=("Arial", 12))
+    label_id_item.place(x=50, y=170)
+    entry_id_item = tk.Entry(menu_window, font=("Arial", 12))
+    entry_id_item.place(x=200, y=170)
 
-    btn_cadastrar = tk.Button(frame_cadastro, text='Cadastrar', command=cadastrar_item)
-    btn_cadastrar.grid(row=2, column=0, pady=5)
+    label_nova_quantidade = tk.Label(menu_window, text="Nova Quantidade:", font=("Arial", 12))
+    label_nova_quantidade.place(x=50, y=200)
+    entry_nova_quantidade = tk.Entry(menu_window, font=("Arial", 12))
+    entry_nova_quantidade.place(x=200, y=200)
 
-    btn_excluir = tk.Button(frame_cadastro, text='Excluir', command=excluir_item)
-    btn_excluir.grid(row=2, column=1, pady=5)
+    button_excluir_item = tk.Button(menu_window, text="Excluir Item", command=excluir_item, font=("Arial", 12))
+    button_excluir_item.place(x=150, y=240)
 
-    btn_alterar = tk.Button(frame_cadastro, text='Alterar', command=alterar_item)
-    btn_alterar.grid(row=2, column=2, pady=5)
+    button_alterar_item = tk.Button(menu_window, text="Alterar Item", command=alterar_item, font=("Arial", 12))
+    button_alterar_item.place(x=150, y=270)
 
-    frame_lista = tk.Frame(main_window)
-    frame_lista.pack(padx=10, pady=10)
+    button_listar_itens = tk.Button(menu_window, text="Listar Itens", command=listar_itens, font=("Arial", 12))
+    button_listar_itens.place(x=150, y=300)
 
-    treeview = tk.ttk.Treeview(frame_lista, columns=('nome', 'quantidade'), show='headings')
-    treeview.heading('nome', text='Nome')
-    treeview.heading('quantidade', text='Quantidade')
-    treeview.pack(side='left')
+    menu_window.mainloop()
 
-    scrollbar = tk.Scrollbar(frame_lista, orient='vertical', command=treeview.yview)
-    scrollbar.pack(side='right', fill='y')
+# Cria a janela de login
+login_window = tk.Tk()
+login_window.title("Janela de Login")
+login_window.geometry("300x200")
+login_window.resizable(False, False)
 
-    treeview.configure(yscrollcommand=scrollbar.set)
+# Adicione os widgets para o login
+label_username = tk.Label(login_window, text="Usuário:", font=("Arial", 12))
+label_username.place(x=50, y=50)
+entry_username = tk.Entry(login_window, font=("Arial", 12))
+entry_username.place(x=150, y=50)
 
-    frame_botoes = tk.Frame(main_window)
-    frame_botoes.pack(pady=10)
+label_password = tk.Label(login_window, text="Senha:", font=("Arial", 12))
+label_password.place(x=50, y=100)
+entry_password = tk.Entry(login_window, show="*", font=("Arial", 12))
+entry_password.place(x=150, y=100)
 
-    btn_listar = tk.Button(frame_botoes, text='Listar Itens', command=listar_itens)
-    btn_listar.pack()
+button_login = tk.Button(login_window, text="Login", command=verificar_login, font=("Arial", 12))
+button_login.place(x=150, y=150)
 
-    btn_limpar = tk.Button(frame_botoes, text='Limpar Campos', command=limpar_campos)
-    btn_limpar.pack()
+button_criar_usuario = tk.Button(login_window, text="Criar Usuário", command=criar_usuario, font=("Arial", 12))
+button_criar_usuario.place(x=50, y=150)
 
-    root.protocol('WM_DELETE_WINDOW', root.quit)
-    main_window.protocol('WM_DELETE_WINDOW', root.quit)
-
-# Criação da janela raiz
-root = tk.Tk()
-root.title('Login')
-root.geometry('300x150')
-
-btn_login = tk.Button(root, text='Login', command=login)
-btn_login.pack(pady=50)
-
-root.mainloop()
+login_window.mainloop()
