@@ -1,40 +1,60 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import sqlite3
+import hashlib
 
 def verificar_login():
     username = entry_username.get()
     password = entry_password.get()
 
-    # Verifique as credenciais do usuário
-    if username == "admin" and password == "123456":
-        messagebox.showinfo("Login", "Login bem-sucedido!")
-        # Destrua a janela de login e crie a nova janela com os menus
-        login_window.destroy()
-        estoque()
+    # Conexão com o banco de dados SQLite
+    conn = sqlite3.connect("almoxarifado.db")
+    cursor = conn.cursor()
+
+    # Verifique as credenciais do usuário no banco de dados
+    cursor.execute("SELECT * FROM usuarios WHERE username=?", (username,))
+    user = cursor.fetchone()
+
+    if user:
+        stored_password = user[1]  # A senha armazenada está na segunda coluna da tabela
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+        if hashed_password == stored_password:
+            messagebox.showinfo("Login", "Login bem-sucedido!")
+            # Destrua a janela de login e crie a nova janela com os menus
+            login_window.destroy()
+            conn.close()  # Feche a conexão com o banco de dados
+            estoque()
+        else:
+            messagebox.showerror("Login", "Usuário ou senha incorretos.")
     else:
         messagebox.showerror("Login", "Usuário ou senha incorretos.")
+    conn.close()  # Feche a conexão com o banco de dados
 
 def criar_usuario():
     username = simpledialog.askstring("Novo Usuário", "Digite o nome de usuário:")
     password = simpledialog.askstring("Novo Usuário", "Digite a senha:")
-    
+
     if username and password:
         # Conexão com o banco de dados SQLite
         conn = sqlite3.connect("almoxarifado.db")
         cursor = conn.cursor()
-        
+
         # Verifica se o usuário já existe
         cursor.execute("SELECT * FROM usuarios WHERE username=?", (username,))
         user = cursor.fetchone()
-        
+
         if user:
             messagebox.showerror("Novo Usuário", "O usuário já existe.")
         else:
+            # Criptografa a senha usando SHA-256
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
             # Insere o novo usuário no banco de dados
-            cursor.execute("INSERT INTO usuarios (username, password) VALUES (?, ?)", (username, password))
+            cursor.execute("INSERT INTO usuarios (username, password) VALUES (?, ?)", (username, hashed_password))
             conn.commit()
             messagebox.showinfo("Novo Usuário", "Usuário criado com sucesso.")
+        conn.close()  # Feche a conexão com o banco de dados
     else:
         messagebox.showerror("Novo Usuário", "Nome de usuário e senha são obrigatórios.")
 
@@ -44,13 +64,13 @@ def estoque():
     menu_window.title("Janela de Menus")
     menu_window.geometry("400x300")
 
-
     # Conexão com o banco de dados SQLite
     conn = sqlite3.connect("almoxarifado.db")
     cursor = conn.cursor()
 
     # Criação da tabela de itens do almoxarifado
     cursor.execute("CREATE TABLE IF NOT EXISTS itens (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, quantidade INTEGER)")
+    conn.commit()
 
     # Adicionar item ao almoxarifado
     def cadastrar_item():
@@ -119,6 +139,16 @@ def estoque():
     button_listar_itens.place(x=150, y=300)
 
     menu_window.mainloop()
+
+     # Feche a conexão com o banco de dados
+    conn.close()
+
+# Cria o banco de dados se não existir
+conn = sqlite3.connect("almoxarifado.db")
+cursor = conn.cursor()
+cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (username TEXT, password TEXT)")
+conn.commit()
+conn.close()
 
 # Cria a janela de login
 login_window = tk.Tk()
